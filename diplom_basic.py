@@ -26,33 +26,36 @@ def main():
         }
     )
 
-    YATOKEN = input('Введите ваш token Яндекс.Диска: ')
-    ya_token = {'Authorization': f'{YATOKEN}'}
+    ya_token = input('Введите ваш token Яндекс.Диска: ')
     folder = input('Введите название для новой папки на Яндекс.Диске, куда нужно скопировать фотографии: ')
     data_list = resp.json()['response']['items']
     count = int(input('Сколько фотографий скопировать (если все, то введите 0): '))
 
-    requests.put(f'https://cloud-api.yandex.net:443/v1/disk/resources?path=%2F{folder}', headers=ya_token)
+    requests.put('https://cloud-api.yandex.net:443/v1/disk/resources',
+                 params={
+                     'path': folder
+                 },
+                 headers={
+                     'Authorization': ya_token
+                 }
+            )
     return ya_token, data_list, folder, count
 
 
 def choose_album():
-    ALBUM_ID = input('Введите альбом, с которого скопировать фотографии\n'
+    while True:
+        ALBUM_ID = input('Введите альбом, с которого скопировать фотографии\n'
                      '(p - profile(фото с профиля), w - wall(фото со стены)): ')
-    try:
         if ALBUM_ID == 'p':
-            album_id = 'profile'
+            return 'profile'
         elif ALBUM_ID == 'w':
-            album_id = 'wall'
-        return album_id
-    except NameError:
+            return 'wall'
         print('Вы ввели неправильное значение - попробуйте заново')
-        return choose_album()
 
 
 class CopyPhotosFromVKtoYADisk:
     def __init__(self, ya_token, data_list, folder, count):
-        self.YA_token = ya_token
+        self.ya_token = ya_token
         self.data_list = data_list
         self.folder = folder
         self.count = count
@@ -89,10 +92,10 @@ class CopyPhotosFromVKtoYADisk:
     def get_filenames(self):
         for date, like in self.date_link_dict.items():
             filename = str(like) + '.jpg'
-            self.filename_list.append(filename)
-            if self.filename_list.count(filename) > 1:
-                self.filename_list.remove(filename)
-                new_filename = filename.replace('jpg', ' ' + date.replace(':', '-') + '.jpg')
+            new_filename = str(like) + '. ' + date.replace(':', '-') + '.jpg'
+            if filename not in self.filename_list:
+                self.filename_list.append(filename)
+            else:
                 self.filename_list.append(new_filename)
         return self.filename_list
 
@@ -100,8 +103,14 @@ class CopyPhotosFromVKtoYADisk:
         for filename, link in tqdm(zip(self.filename_list, self.link_list), total=len(self.filename_list)):
             response_from_link = requests.get(link)
             response = requests.get(
-                f'https://cloud-api.yandex.net:443/v1/disk/resources/upload?path=%2F{folder}%2F{filename}',
-            headers=ya_token)
+                'https://cloud-api.yandex.net:443/v1/disk/resources/upload',
+                params={
+                    'path': f'{self.folder}/ {filename}'
+                },
+                headers={
+                     'Authorization': self.ya_token
+                 }
+            )
             href = response.json()['href']
             requests.put(href, data=response_from_link.content)
 
